@@ -90,8 +90,8 @@ This makes the design a **universal up/down counter with reset, preset, and load
 UpDown-Counter-TFlipFlop/
 │
 ├── T_flipflop.v          # T Flip-Flop module (core building block, reusable component)
-├── updowncounter.v       # Synthesizable top-level `updowncounter` module + `updowncounter_tb` testbench
-├── updowncounter_tb      # Testbench module for updowncounter.v (defined inside updowncounter.v)
+├── updowncounter.v       # Synthesizable top-level `updowncounter` module
+├── updowncounter_tb      # Testbench module for updowncounter.v
 │
 ├── dump.vcd              # Value Change Dump file generated after simulation (for GTKWave)
 ├── io_wave.png           # Screenshot of the simulated input/output waveform (GTKWave capture)
