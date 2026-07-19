@@ -91,7 +91,7 @@ UpDown-Counter-TFlipFlop/
 │
 ├── dump.vcd              # Value Change Dump file generated after simulation (for GTKWave)
 ├── io_wave.png           # Screenshot of the simulated input/output waveform (GTKWave capture)
-├── scamatic.png           # Schematic diagram of the counter (RTL schematic, e.g., from Vivado)
+├── scamatic.pdf          # Schematic diagram of the counter (RTL schematic, e.g., from Vivado)
 │
 └── README.md             # This file — full project documentation
 ```
