@@ -91,6 +91,7 @@ UpDown-Counter-TFlipFlop/
 │
 ├── T_flipflop.v          # T Flip-Flop module (core building block, reusable component)
 ├── updowncounter.v       # Synthesizable top-level `updowncounter` module + `updowncounter_tb` testbench
+├── updowncounter_tb      # Testbench module for updowncounter.v (defined inside updowncounter.v)
 │
 ├── dump.vcd              # Value Change Dump file generated after simulation (for GTKWave)
 ├── io_wave.png           # Screenshot of the simulated input/output waveform (GTKWave capture)
@@ -230,6 +231,7 @@ Because this module contains **only** input/output ports, wires, and structural 
 ### Module 3: `updowncounter_tb` (updowncounter.v)
 
 ```verilog
+`timescale 1ns / 1ps
 module updowncounter_tb;
 reg clk,rst,prt,ld;
 reg [2:0] a;
@@ -243,7 +245,7 @@ This module is now a **pure testbench** — it no longer instantiates `tflipflop
 
 The testbench still handles all simulation-only responsibilities:
 - Drives the clock (`always #5 clk = ~clk`, giving a 10ns period / 100MHz-equivalent simulation clock)
-- Applies a sequence of stimulus vectors to exercise every operating mode (reset, preset, up-count, down-count, load)
+- Applies a sequence of stimulus vectors to exercise every operating mode (reset, preset, up-count, down-count, load) — matching exactly the [Testbench Stimulus Timeline](#-testbench-stimulus-timeline) table below
 - Dumps signal changes to `dump.vcd` for GTKWave via `$dumpfile`/`$dumpvars`
 - Prints a live `$monitor` log of every signal transition to the simulation console
 
@@ -609,3 +611,4 @@ Designed, simulated, and documented as a personal/academic digital logic design 
 ---
 
 ⭐ If you found this project helpful for learning sequential circuit design in Verilog, consider starring the repository!
+
