@@ -159,8 +159,8 @@ T2 = (~ud & Q0 & Q1) | (ud & QB0 & QB1)            (toggles Q2 when Q0=Q1=1 in u
 This is exactly what is coded in the testbench's structural instantiation:
 
 ```verilog
-tflipflop t0(clk,rst,prt,ld,a[0], 1'b1,                                   Q[0],QB[0]);
-tflipflop t1(clk,rst,prt,ld,a[1], ud ^ Q[0],                              Q[1],QB[1]);
+tflipflop t0(clk,rst,prt,ld,a[0], 1'b1,Q[0],QB[0]);
+tflipflop t1(clk,rst,prt,ld,a[1], ud ^ Q[0],Q[1],QB[1]);
 tflipflop t2(clk,rst,prt,ld,a[2], (~ud & Q[0] & Q[1]) | (ud & QB[0] & QB[1]), Q[2],QB[2]);
 ```
 
