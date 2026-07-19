@@ -23,10 +23,12 @@ A fully synchronous **3-bit Up/Down Counter** designed at the gate/structural le
    - [Toggle Equation Derivation](#toggle-equation-derivation)
 6. [Module-by-Module Description](#-module-by-module-description)
    - [Module 1: `tflipflop` (T_flipflop.v)](#module-1-tflipflop-t_flipflopv)
-   - [Module 2: `updowncounter_tb` (updowncounter.v)](#module-2-updowncounter_tb-updowncounterv)
+   - [Module 2: `updowncounter` (updowncounter.v)](#module-2-updowncounter-updowncounterv)
+   - [Module 3: `updowncounter_tb` (updowncounter.v)](#module-3-updowncounter_tb-updowncounterv)
 7. [Pin / Port Description](#-pin--port-description)
    - [T Flip-Flop Pin Description](#t-flip-flop-pin-description)
-   - [Top-Level / Testbench Pin Description](#top-level--testbench-pin-description)
+   - [Top-Level `updowncounter` Pin Description](#top-level-updowncounter-pin-description)
+   - [Testbench Pin Description](#testbench-pin-description)
 8. [Internal Signal Connectivity (Structural Wiring)](#-internal-signal-connectivity-structural-wiring)
 9. [State / Mode Table](#-state--mode-table)
 10. [Testbench Stimulus Timeline](#-testbench-stimulus-timeline)
@@ -68,6 +70,7 @@ This makes the design a **universal up/down counter with reset, preset, and load
 
 - ✅ 3-bit synchronous Up/Down counter
 - ✅ Built using structural instantiation of custom T Flip-Flops (no behavioral `+1` shortcut)
+- ✅ **Clean separation** between the synthesizable design (`updowncounter` module) and the testbench (`updowncounter_tb`) — the testbench simply instantiates the design as a single unit (`u1`)
 - ✅ Synchronous active-high **Reset**
 - ✅ Synchronous active-high **Preset** (sets counter to all 1s)
 - ✅ Synchronous active-high **Parallel Load** of a 3-bit value
@@ -75,7 +78,7 @@ This makes the design a **universal up/down counter with reset, preset, and load
 - ✅ Dual outputs available: `Q` (true) and `QB` (complement) for every bit
 - ✅ Self-contained testbench with clock generation, stimulus sequencing, and `$monitor` console logging
 - ✅ VCD dump generation for waveform analysis in GTKWave
-- ✅ Fully synthesizable RTL, verified in Xilinx Vivado
+- ✅ Fully synthesizable RTL (the `updowncounter` module contains zero simulation-only constructs), verified in Xilinx Vivado
 - ✅ Clean modular code — easy to extend to 4-bit, 8-bit, or n-bit counters
 - ✅ Priority-encoded control logic: `rst` > `prt` > `ld` > `toggle`
 
@@ -87,16 +90,16 @@ This makes the design a **universal up/down counter with reset, preset, and load
 UpDown-Counter-TFlipFlop/
 │
 ├── T_flipflop.v          # T Flip-Flop module (core building block, reusable component)
-├── updowncounter.v       # Top-level structural counter + testbench (updowncounter_tb)
+├── updowncounter.v       # Synthesizable top-level `updowncounter` module + `updowncounter_tb` testbench
 │
 ├── dump.vcd              # Value Change Dump file generated after simulation (for GTKWave)
 ├── io_wave.png           # Screenshot of the simulated input/output waveform (GTKWave capture)
-├── scamatic.pdf          # Schematic diagram of the counter (RTL schematic, e.g., from Vivado)
+├── scamatic.pdf          # Schematic diagram of the counter (RTL schematic, exported as PDF from Vivado)
 │
 └── README.md             # This file — full project documentation
 ```
 
-> **Note:** The counter's structural design (instantiation of the three T flip-flops with their toggle-logic equations) lives directly inside the `updowncounter_tb` module in `updowncounter.v`. There is no separate "DUT-only" wrapper module — the testbench module itself acts as both the **structural top level** and the **stimulus generator**. This is intentional for quick simulation-only projects; see [Future Improvements](#-future-improvements) for how to split this into a pure DUT + separate TB.
+> **Note:** `updowncounter.v` now contains **two** modules: the synthesizable structural top level `updowncounter` (instantiating the three `tflipflop`s with internal wires `w`/`wB` and driving the external `Q`/`QB` outputs via `assign`), and the testbench `updowncounter_tb`, which instantiates `updowncounter` as a single unit (`u1`) and drives it with stimulus. This is a clean DUT-vs-testbench separation — the design itself contains no simulation-only constructs and is directly synthesizable in Vivado without modification.
 
 ---
 
@@ -144,25 +147,37 @@ A classical way to build an n-bit up/down counter from T flip-flops is to comput
 
 ### Toggle Equation Derivation
 
-For this 3-bit counter (bits `Q0`, `Q1`, `Q2`), the toggle inputs used in `updowncounter.v` are:
+For this 3-bit counter (internal bits `w0`, `w1`, `w2`, later assigned out to `Q`), the toggle inputs used inside the `updowncounter` module are:
 
 ```
 T0 = 1                                            (LSB always toggles every clock)
-T1 = (ud & Q0) | (~ud & Q0)  =  ud ^ Q0            (toggles Q1 when Q0=1 in up-mode, or Q0=0 in down-mode)
-T2 = (~ud & Q0 & Q1) | (ud & QB0 & QB1)            (toggles Q2 when Q0=Q1=1 in up-mode, or Q0=Q1=0 in down-mode)
+T1 = (ud & w0) | (~ud & w0)  =  ud ^ w0            (toggles w1 when w0=1 in up-mode, or w0=0 in down-mode)
+T2 = (~ud & w0 & w1) | (ud & wB0 & wB1)            (toggles w2 when w0=w1=1 in up-mode, or w0=w1=0 in down-mode)
 ```
 
 **Verification:**
-- When `ud = 0` (Up): `T1 = Q0`, `T2 = Q0 & Q1` → standard ripple/synchronous up-counter carry logic ✔
-- When `ud = 1` (Down): `T1 = ~Q0`, `T2 = QB0 & QB1 = ~Q0 & ~Q1` → standard down-counter borrow logic ✔
+- When `ud = 0` (Up): `T1 = w0`, `T2 = w0 & w1` → standard ripple/synchronous up-counter carry logic ✔
+- When `ud = 1` (Down): `T1 = ~w0`, `T2 = wB0 & wB1 = ~w0 & ~w1` → standard down-counter borrow logic ✔
 
-This is exactly what is coded in the testbench's structural instantiation:
+This is exactly what is coded inside the `updowncounter` module:
 
 ```verilog
-tflipflop t0(clk,rst,prt,ld,a[0], 1'b1,Q[0],QB[0]);
-tflipflop t1(clk,rst,prt,ld,a[1], ud ^ Q[0],Q[1],QB[1]);
-tflipflop t2(clk,rst,prt,ld,a[2], (~ud & Q[0] & Q[1]) | (ud & QB[0] & QB[1]), Q[2],QB[2]);
+module updowncounter(clk,rst,prt,ld,ud,a,Q,QB);
+input clk,rst,prt,ld,ud;
+input [2:0] a;
+output [2:0] Q,QB;
+wire [2:0] w,wB;
+
+tflipflop t0(clk,rst,prt,ld,a[0], 1'b1,                                    w[0],wB[0]);
+tflipflop t1(clk,rst,prt,ld,a[1], ud ^ w[0],                               w[1],wB[1]);
+tflipflop t2(clk,rst,prt,ld,a[2], (~ud & w[0] & w[1]) | (ud & wB[0] & wB[1]), w[2],wB[2]);
+
+assign Q  = w;
+assign QB = wB;
+endmodule
 ```
+
+> Note the internal signals are named `w`/`wB` (not `Q`/`QB`) inside `updowncounter` — the module's own `Q`/`QB` **outputs** are driven only at the very end via two `assign` statements. This keeps the internal wiring clearly separated from the module's external interface.
 
 ---
 
@@ -186,7 +201,33 @@ This is the reusable, parametrized-by-instantiation core building block of the e
 
 This priority-encoded `if–else if–else` structure ensures **no conflicting simultaneous assignments** and mirrors real hardware behavior of a JK/T flip-flop with reset/preset/load override pins, similar to a 74LS112-style flip-flop with additional load capability.
 
-### Module 2: `updowncounter_tb` (updowncounter.v)
+### Module 2: `updowncounter` (updowncounter.v)
+
+```verilog
+module updowncounter(clk,rst,prt,ld,ud,a,Q,QB);
+input clk,rst,prt,ld,ud;
+input [2:0] a;
+output [2:0] Q,QB;
+wire [2:0] w,wB;
+```
+
+**Description:**
+This is the **synthesizable structural top-level design** — the actual up/down counter, free of any simulation-only constructs. It instantiates **three `tflipflop` modules** (`t0`, `t1`, `t2`) and wires their toggle (`t`) inputs using the combinational logic derived in the [Toggle Equation Derivation](#toggle-equation-derivation) section above:
+
+- `t0` always toggles (`t = 1'b1`) — the LSB flips on every clock.
+- `t1`'s toggle input is `ud ^ w[0]` — direction-dependent toggle based on the LSB.
+- `t2`'s toggle input is `(~ud & w[0] & w[1]) | (ud & wB[0] & wB[1])` — direction-dependent toggle based on both lower bits.
+
+The internal wires `w[2:0]` and `wB[2:0]` carry each flip-flop's raw `Q`/`QB` outputs, which are then routed to the module's actual outputs via two continuous assignments:
+
+```verilog
+assign Q  = w;
+assign QB = wB;
+```
+
+Because this module contains **only** input/output ports, wires, and structural instantiations (no `initial` blocks, no `$monitor`, no `$dumpfile`), it can be handed directly to Vivado (or any synthesis tool) as the design's top module.
+
+### Module 3: `updowncounter_tb` (updowncounter.v)
 
 ```verilog
 module updowncounter_tb;
@@ -194,27 +235,30 @@ reg clk,rst,prt,ld;
 reg [2:0] a;
 wire [2:0] Q,QB;
 reg ud;
+updowncounter u1(clk,rst,prt,ld,ud,a,Q,QB);
 ```
 
 **Description:**
-This module serves a dual purpose:
+This module is now a **pure testbench** — it no longer instantiates `tflipflop` directly. Instead, it instantiates a single instance of the top-level `updowncounter` module (`u1`) and treats it as a black box, connecting to it only through its external ports (`clk`, `rst`, `prt`, `ld`, `ud`, `a`, `Q`, `QB`). This is the standard, clean way to structure a Verilog testbench: **one line to instantiate the DUT**, followed by stimulus generation.
 
-1. **Structural Top-Level Design:** It instantiates **three `tflipflop` modules** (`t0`, `t1`, `t2`) and wires their toggle (`t`) inputs using the combinational logic derived above, producing a complete 3-bit up/down counter with `Q[2:0]` as the counter's state output and `QB[2:0]` as its bitwise complement.
-
-2. **Testbench / Stimulus Generator:** It also drives the clock (`#5 clk = ~clk`, giving a 10ns period / 100MHz-equivalent simulation clock), applies a sequence of stimulus vectors to exercise every operating mode (reset, preset, up-count, down-count, load), dumps signal changes to `dump.vcd` for GTKWave, and prints a live `$monitor` log to the simulation console.
+The testbench still handles all simulation-only responsibilities:
+- Drives the clock (`always #5 clk = ~clk`, giving a 10ns period / 100MHz-equivalent simulation clock)
+- Applies a sequence of stimulus vectors to exercise every operating mode (reset, preset, up-count, down-count, load)
+- Dumps signal changes to `dump.vcd` for GTKWave via `$dumpfile`/`$dumpvars`
+- Prints a live `$monitor` log of every signal transition to the simulation console
 
 **Key internal signals:**
 
 | Signal | Type | Width | Description |
 |---|---|---|---|
 | `clk` | reg | 1-bit | Simulation clock, toggled every 5ns (10ns period) |
-| `rst` | reg | 1-bit | Synchronous reset control, applied to all 3 flip-flops |
-| `prt` | reg | 1-bit | Synchronous preset control, applied to all 3 flip-flops |
-| `ld` | reg | 1-bit | Synchronous parallel load enable, applied to all 3 flip-flops |
-| `a` | reg | 3-bit | Parallel load data bus (`a[0]`, `a[1]`, `a[2]` feed each flip-flop's `a` input) |
-| `ud` | reg | 1-bit | Up/Down mode select (`0` = up, `1` = down) |
-| `Q` | wire | 3-bit | Counter output — `Q[0]` = LSB, `Q[2]` = MSB |
-| `QB` | wire | 3-bit | Complement of counter output |
+| `rst` | reg | 1-bit | Synchronous reset control, fed into `u1` |
+| `prt` | reg | 1-bit | Synchronous preset control, fed into `u1` |
+| `ld` | reg | 1-bit | Synchronous parallel load enable, fed into `u1` |
+| `a` | reg | 3-bit | Parallel load data bus, fed into `u1` |
+| `ud` | reg | 1-bit | Up/Down mode select (`0` = up, `1` = down), fed into `u1` |
+| `Q` | wire | 3-bit | Counter output from `u1` — `Q[0]` = LSB, `Q[2]` = MSB |
+| `QB` | wire | 3-bit | Complement of counter output from `u1` |
 
 ---
 
@@ -233,24 +277,38 @@ This module serves a dual purpose:
 | `Q` | Output (reg) | 1-bit | — | True/normal flip-flop output |
 | `QB` | Output (reg) | 1-bit | — | Complementary flip-flop output |
 
-### Top-Level / Testbench Pin Description
+### Top-Level `updowncounter` Pin Description
+
+| Pin Name | Direction | Width | Description |
+|---|---|---|---|
+| `clk` | Input | 1-bit | System clock |
+| `rst` | Input | 1-bit | Synchronous reset, broadcast to all 3 internal flip-flops |
+| `prt` | Input | 1-bit | Synchronous preset, broadcast to all 3 internal flip-flops |
+| `ld` | Input | 1-bit | Synchronous parallel load enable, broadcast to all 3 internal flip-flops |
+| `ud` | Input | 1-bit | Direction control: `0` = Up-count, `1` = Down-count |
+| `a[2:0]` | Input | 3-bit | Parallel data to be loaded into the counter when `ld=1` |
+| `Q[2:0]` | Output | 3-bit | Current counter value (`Q[2]` MSB … `Q[0]` LSB) |
+| `QB[2:0]` | Output | 3-bit | Bitwise complement of the counter value |
+
+### Testbench Pin Description
 
 | Pin Name | Direction | Width | Description |
 |---|---|---|---|
 | `clk` | internal reg | 1-bit | Generated clock (period = 10ns, driven by `always #5 clk=~clk`) |
-| `rst` | internal reg (stimulus) | 1-bit | Global synchronous reset applied to all flip-flops |
-| `prt` | internal reg (stimulus) | 1-bit | Global synchronous preset applied to all flip-flops |
-| `ld` | internal reg (stimulus) | 1-bit | Global synchronous load-enable applied to all flip-flops |
-| `a[2:0]` | internal reg (stimulus) | 3-bit | Parallel data to be loaded into the counter when `ld=1` |
-| `ud` | internal reg (stimulus) | 1-bit | Direction control: `0` = Up-count, `1` = Down-count |
-| `Q[2:0]` | internal wire (observed) | 3-bit | Current counter value (Q[2] MSB … Q[0] LSB) |
-| `QB[2:0]` | internal wire (observed) | 3-bit | Bitwise complement of the counter value |
+| `rst` | internal reg (stimulus) | 1-bit | Global synchronous reset, connected to `u1.rst` |
+| `prt` | internal reg (stimulus) | 1-bit | Global synchronous preset, connected to `u1.prt` |
+| `ld` | internal reg (stimulus) | 1-bit | Global synchronous load-enable, connected to `u1.ld` |
+| `a[2:0]` | internal reg (stimulus) | 3-bit | Parallel data to be loaded, connected to `u1.a` |
+| `ud` | internal reg (stimulus) | 1-bit | Direction control, connected to `u1.ud` |
+| `Q[2:0]` | internal wire (observed) | 3-bit | Current counter value, driven by `u1.Q` |
+| `QB[2:0]` | internal wire (observed) | 3-bit | Bitwise complement of the counter value, driven by `u1.QB` |
 
 ---
 
 ## 🔗 Internal Signal Connectivity (Structural Wiring)
 
 ```
+module updowncounter  (top-level, synthesizable)
 ┌───────────────────────────────────────────────────────────────────┐
 │              Global Control Bus: clk / rst / prt / ld              │
 └─────────┬───────────────────────┬───────────────────────┬─────────┘
@@ -260,20 +318,23 @@ This module serves a dual purpose:
 │    t0  (bit 0)    │   │    t1  (bit 1)    │   │    t2  (bit 2)    │
 │      a = a[0]     │   │      a = a[1]     │   │      a = a[2]     │
 │      t = 1'b1     │   │       t = T1      │   │       t = T2      │
-│     Q  -> Q[0]    │   │     Q  -> Q[1]    │   │     Q  -> Q[2]    │
-│    QB -> QB[0]    │   │    QB -> QB[1]    │   │    QB -> QB[2]    │
+│     Q  -> w[0]    │   │     Q  -> w[1]    │   │     Q  -> w[2]    │
+│    QB -> wB[0]    │   │    QB -> wB[1]    │   │    QB -> wB[2]    │
 └───────────────────┘   └───────────────────┘   └───────────────────┘
 
-        Q0, QB0 ────────────────────► feed into the T1 and T2 equations below
-        Q1, QB1 ────────────────────────────────────► feed into the T2 equation
+        w0, wB0 ────────────────────► feed into the T1 and T2 equations below
+        w1, wB1 ────────────────────────────────────► feed into the T2 equation
 
-        T1 = ud ^ Q0
-        T2 = (~ud & Q0 & Q1) | (ud & QB0 & QB1)
+        T1 = ud ^ w0
+        T2 = (~ud & w0 & w1) | (ud & wB0 & wB1)
+
+        assign Q  = w;      // module output Q[2:0]  <= w[2:0]
+        assign QB = wB;     // module output QB[2:0] <= wB[2:0]
 ```
 
-> This diagram is a fixed-width ASCII block — it renders correctly on GitHub as long as it stays inside a fenced code block, since GitHub always displays code blocks in a monospace font (which is why the previous version looked misaligned outside of one).
+> This diagram is a fixed-width ASCII block — it renders correctly on GitHub as long as it stays inside a fenced code block, since GitHub always displays code blocks in a monospace font.
 
-Each flip-flop shares the same global `clk`, `rst`, `prt`, and `ld` signals — only the `t` (toggle) input and the `a` (load-data) input differ per bit, which is what gives the design its up/down counting behavior.
+The internal wires `w[2:0]` / `wB[2:0]` are only visible *inside* `updowncounter` — from the outside (i.e. from `updowncounter_tb`), only the module's `Q[2:0]` / `QB[2:0]` output ports are visible, since they are the values assigned from `w`/`wB` at the very end of the module.
 
 ---
 
@@ -323,13 +384,14 @@ The `initial` block in `updowncounter.v` walks the counter through **every funct
 
 1. **Design Planning:** Started with the excitation-table-based design approach for a T flip-flop up/down counter — derived toggle equations `T0`, `T1`, `T2` on paper using Karnaugh maps / carry-borrow logic for a 3-bit counter.
 2. **Core Component (`T_flipflop.v`):** Implemented a single reusable synchronous T flip-flop with reset, preset, load, and toggle, written and edited in **VS Code**.
-3. **Structural Top + Testbench (`updowncounter.v`):** Instantiated three `tflipflop` modules and wired the derived toggle equations combinationally, then wrote a comprehensive testbench stimulus to validate reset, preset, load, up-count, and down-count operation.
-4. **Compilation & Simulation:** Compiled and simulated using **Icarus Verilog** (`iverilog` + `vvp`) directly from the VS Code integrated terminal on Windows.
-5. **Waveform Dumping:** Used `$dumpfile("dump.vcd")` and `$dumpvars` to generate a VCD waveform trace of every signal.
-6. **Waveform Analysis:** Opened `dump.vcd` in **GTKWave**, arranged the `clk`, `rst`, `prt`, `ld`, `ud`, `a`, `Q`, `QB` signals, and captured the annotated screenshot `io_wave.png`.
-7. **Console Verification:** Used `$monitor` to print a live text log of every signal transition to the terminal, cross-checked manually against the expected up/down sequence.
-8. **Synthesis Cross-Check:** Imported the RTL into **Xilinx Vivado**, ran synthesis and generated the RTL schematic (exported as `scamatic.png`) to visually confirm the structural connectivity of the three flip-flops and their toggle logic.
-9. **Documentation:** Wrote this README to document the theory, module structure, pin descriptions, and simulation/synthesis workflow for future reference and GitHub publishing.
+3. **Structural Top (`updowncounter` in `updowncounter.v`):** Instantiated three `tflipflop` modules and wired the derived toggle equations combinationally (using internal wires `w`/`wB`), then exposed only `Q`/`QB` as the module's outputs via `assign` — keeping the design 100% synthesizable and free of testbench code.
+4. **Testbench (`updowncounter_tb` in `updowncounter.v`):** Instantiated the `updowncounter` module as a single black-box unit (`u1`) and wrote a comprehensive stimulus sequence to validate reset, preset, load, up-count, and down-count operation.
+5. **Compilation & Simulation:** Compiled and simulated using **Icarus Verilog** (`iverilog` + `vvp`) directly from the VS Code integrated terminal.
+6. **Waveform Dumping:** Used `$dumpfile("dump.vcd")` and `$dumpvars` to generate a VCD waveform trace of every signal.
+7. **Waveform Analysis:** Opened `dump.vcd` in **GTKWave**, arranged the `clk`, `rst`, `prt`, `ld`, `ud`, `a`, `Q`, `QB` signals, and captured the annotated screenshot `io_wave.png`.
+8. **Console Verification:** Used `$monitor` to print a live text log of every signal transition to the terminal, cross-checked manually against the expected up/down sequence.
+9. **Synthesis Cross-Check:** Imported `updowncounter` (the design-only module, not the testbench) into **Xilinx Vivado**, ran synthesis, and exported the RTL schematic as a PDF (`scamatic.pdf`) to visually confirm the structural connectivity of the three flip-flops and their toggle logic.
+10. **Documentation:** Wrote this README to document the theory, module structure, pin descriptions, and simulation/synthesis workflow for future reference and GitHub publishing.
 
 ---
 
@@ -436,7 +498,7 @@ gtkwave dump.vcd
 ## 📉 Viewing Waveforms in GTKWave
 
 1. Launch GTKWave and open `dump.vcd` (or run `gtkwave dump.vcd` from the terminal as shown above).
-2. In the **SST (Signal Search Tree)** panel on the left, expand `updowncounter_tb`.
+2. In the **SST (Signal Search Tree)** panel on the left, expand `updowncounter_tb` — the top-level testbench signals (`clk`, `rst`, `prt`, `ld`, `ud`, `a`, `Q`, `QB`) are visible directly there; expand further into `u1` if you want to probe the internal `w`/`wB` wires inside the `updowncounter` instance.
 3. Drag and drop `clk`, `rst`, `prt`, `ld`, `ud`, `a[2:0]`, `Q[2:0]`, and `QB[2:0]` into the waveform viewer.
 4. Set `a` and `Q`/`QB` display formats to **Decimal** or **Binary** (right-click the signal → Data Format) for easier readability.
 5. Zoom in/out (`Ctrl + Scroll` or the toolbar zoom icons) to inspect each 100ns test phase (reset, up-count, preset, down-count, load) individually.
@@ -447,10 +509,10 @@ gtkwave dump.vcd
 ## ⚙ Simulating / Synthesizing in Xilinx Vivado
 
 1. Open **Xilinx Vivado** → **Create New Project**.
-2. Add `T_flipflop.v` and `updowncounter.v` as **Design Sources** (Vivado will automatically treat `updowncounter_tb` as containing the top-level hierarchy since it instantiates `tflipflop`).
-3. If synthesizing only the counter logic (not the testbench stimulus), extract the flip-flop instantiations into a separate top module (see [Future Improvements](#-future-improvements)) — pure testbenches with `initial` blocks and `$monitor`/`$dumpfile` are simulation-only constructs and are not synthesizable.
+2. Add `T_flipflop.v` and `updowncounter.v` as **Design Sources**. Because `updowncounter.v` now contains two modules (`updowncounter` and `updowncounter_tb`), explicitly set **`updowncounter`** as the **Top Module** in the Sources panel (right-click → **Set as Top**) — this excludes the testbench from synthesis automatically.
+3. Optionally, add `updowncounter_tb`'s module as a **Simulation Source** (or keep it as a design source and mark it "Used in: Simulation only") so Vivado's simulator can run the same stimulus used in Icarus Verilog/GTKWave.
 4. Run **Behavioral Simulation** in Vivado's simulator to reproduce the same waveform seen in GTKWave.
-5. Run **Synthesis** → **Open Elaborated/Synthesized Design** → **Schematic** to view the auto-generated RTL schematic of the flip-flop network (this is the source of `scamatic.png`).
+5. Run **Synthesis** → **Open Synthesized Design** → **Schematic** to view the auto-generated RTL schematic of the flip-flop network. Export it as a PDF (**File → Export → Export Schematic PDF**, or print the schematic view to PDF) — this is the source of `scamatic.pdf`.
 6. Optionally run **Implementation** and generate a **Bitstream** if targeting a physical FPGA board.
 
 ---
@@ -475,11 +537,11 @@ at time                 700: clk=... $finish called
 
 ## 🖼 Schematic
 
-The file **`scamatic.png`** (RTL schematic exported from Xilinx Vivado) illustrates the structural connectivity between the three `tflipflop` instances (`t0`, `t1`, `t2`) and the combinational toggle-logic gates (`XOR`, `AND`, `OR`, inverters) that generate `T1` and `T2` from `Q0`, `Q1`, `QB0`, `QB1`, and `ud`.
+The file **`scamatic.pdf`** (RTL schematic exported from Xilinx Vivado) illustrates the structural connectivity between the three `tflipflop` instances (`t0`, `t1`, `t2`) inside the `updowncounter` module, and the combinational toggle-logic gates (`XOR`, `AND`, `OR`, inverters) that generate `T1` and `T2` from `w0`, `w1`, `wB0`, `wB1`, and `ud`.
 
-> 📌 Place `scamatic.png` in the repository root (already referenced in the [File Structure](#-repository--file-structure) above) — GitHub will render it automatically if linked in this README, e.g.:
+> 📌 Since GitHub's `![...]()` image syntax only renders raster images (PNG/JPG/GIF/SVG) inline, a **PDF cannot be embedded as an inline image** — GitHub instead shows PDFs with a file-preview/download link when you click them in the repo file browser. Link to it as a regular Markdown link instead:
 > ```markdown
-> ![Schematic](scamatic.png)
+> [📄 View Schematic (PDF)](scamatic.pdf)
 > ```
 
 ## 🌊 I/O Waveform
@@ -510,18 +572,17 @@ gtkwave dump.vcd
 ## ⚠ Limitations
 
 - Fixed at 3 bits — not currently parameterized for arbitrary width
-- The stimulus/testbench and structural design coexist in a single module (`updowncounter_tb`), which is convenient for simulation but is **not synthesizable as-is** for FPGA implementation without separating the DUT from the testbench
 - No asynchronous reset/preset — all control signals are synchronous only
 - No overflow/underflow flag output
 
 ## 🚀 Future Improvements
 
 - [ ] Parameterize the design (`parameter N = 3`) for an n-bit generic up/down counter
-- [ ] Split into a pure synthesizable top module (`updowncounter.v`) + separate testbench file (`updowncounter_tb.v`)
 - [ ] Add asynchronous reset option
 - [ ] Add terminal count / overflow (`TC`) output flag
 - [ ] Add SystemVerilog assertions (SVA) for self-checking verification
 - [ ] Add a constraints file (`.xdc`) for real FPGA board deployment in Vivado
+- [x] ~~Split into a pure synthesizable top module + separate testbench~~ — done: `updowncounter` (design) and `updowncounter_tb` (testbench) are now cleanly separated
 
 ## ❓ Troubleshooting / FAQ
 
@@ -532,7 +593,7 @@ A: Add the Icarus Verilog installation's `bin` directory to your Windows `PATH` 
 A: Manually expand the `updowncounter_tb` hierarchy in the SST panel on the left and drag the desired signals into the main waveform view — GTKWave does not auto-populate the view on first open.
 
 **Q: Vivado gives a synthesis error about `$monitor`/`$dumpfile`/`initial` timing controls.**
-A: These are simulation-only system tasks. For synthesis, only synthesize the structural flip-flop instantiation portion (excluding the stimulus `initial` block), per the note in [Simulating / Synthesizing in Xilinx Vivado](#-simulating--synthesizing-in-xilinx-vivado).
+A: This means Vivado is trying to synthesize `updowncounter_tb` instead of `updowncounter`. Right-click `updowncounter` in the Sources panel and choose **Set as Top** — the design module contains no simulation-only system tasks and will synthesize cleanly on its own.
 
 **Q: Why does `Q` momentarily hold an unexpected value right after `rst`/`prt`/`ld` is de-asserted?**
 A: Because all control transitions are **synchronous** — the new mode only takes effect on the *next* `posedge clk` after the control signal changes, which is expected, standard synchronous design behavior.
@@ -548,4 +609,3 @@ Designed, simulated, and documented as a personal/academic digital logic design 
 ---
 
 ⭐ If you found this project helpful for learning sequential circuit design in Verilog, consider starring the repository!
-
