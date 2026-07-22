@@ -312,7 +312,7 @@ The testbench still handles all simulation-only responsibilities:
 ```
 module updowncounter  (top-level, synthesizable)
 ┌───────────────────────────────────────────────────────────────────┐
-│              Global Control Bus: clk / rst / prt / ld              │
+│              Global Control Bus: clk / rst / prt / ld             │
 └─────────┬───────────────────────┬───────────────────────┬─────────┘
           │                       │                       │
           ▼                       ▼                       ▼
