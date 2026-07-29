@@ -9,7 +9,7 @@ A 3-bit synchronous Up/Down counter built structurally in Verilog using custom T
 
 A fully synchronous **3-bit Up/Down Counter** designed at the gate/structural level using **T Flip-Flops (Toggle Flip-Flops)**. The counter supports **synchronous reset**, **synchronous preset**, and **parallel (synchronous) load**, and can count **up** or **down** based on a mode-control signal `ud`. The design is verified using a self-checking testbench simulated in **Icarus Verilog**, with waveform inspection in **GTKWave**, developed in **VS Code**, and cross-verified/synthesizable in **Xilinx Vivado**.
 
----
+--- 
 
 ## 📖 Table of Contents
 
